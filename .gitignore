@@ -1,0 +1,4 @@
+*.tgz
+kafka_*/
+__pycache__/
+.env

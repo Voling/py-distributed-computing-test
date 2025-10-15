@@ -1,0 +1,4 @@
+confluent-kafka
+kafka
+celery[redis]
+dotenv
