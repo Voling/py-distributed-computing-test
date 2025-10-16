@@ -55,10 +55,4 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, _halt)
     signal.signal(signal.SIGTERM, _halt) #Permit termination commands
     consumers  = []
-    for i in range(10):
-        t = threading.Thread(target=run_consumer, args=[stop], name="kafka-consumer") #start new thread for consumer
-        consumers.append(t)
-    for i in consumers:
-        i.start()
-    for i in consumers:
-        i.join()
+    run_consumer(stop)
