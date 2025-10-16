@@ -1,4 +1,4 @@
-from confluent_kafka import Consumer, KafkaError
+from confluent_kafka import Consumer, KafkaError, TopicPartition
 from dotenv import load_dotenv
 from os import getenv
 import signal
@@ -7,6 +7,8 @@ import json
 from celery import Celery
 from Producer import Producer
 import time
+from metrics import *
+
 load_dotenv()
 BROKER_NAME = getenv("BROKER_NAME", "kafka:9092")
 TOPIC_NAME = getenv("TOPIC_NAME", "quickstart-events")
@@ -26,15 +28,16 @@ def run_consumer(stop_event: threading.Event):
     try:
         while not stop_event.is_set(): #loop over stop
             msg = consumer.poll(1.0)
-            if msg is None:
+            if msg is None: #Prevent processing of None/error messages
                 continue
-            if msg.error():
+            if msg.error(): 
                 if msg.error().code() != KafkaError._PARTITION_EOF:
                     print("Kafka error:", msg.error())
+                    kafka_errors_total.inc() #report error to Prometheus
                 continue
-
             val = msg.value()
             try:
+                kafka_msgs_total.inc()
                 payload = json.loads(val.decode("utf-8"))
             except Exception:
                 payload = {"raw": val.decode("utf-8", "ignore")}
@@ -50,7 +53,12 @@ if __name__ == "__main__":
         producer.send(msg, repetitions=1)
         time.sleep(0.5)
     signal.signal(signal.SIGINT, _halt)
-    signal.signal(signal.SIGTERM, _halt)
-    t = threading.Thread(target=run_consumer, args=[stop], name="kafka-consumer") #start new thread for consumer
-    t.start()
-    t.join()
+    signal.signal(signal.SIGTERM, _halt) #Permit termination commands
+    consumers  = []
+    for i in range(10):
+        t = threading.Thread(target=run_consumer, args=[stop], name="kafka-consumer") #start new thread for consumer
+        consumers.append(t)
+    for i in consumers:
+        i.start()
+    for i in consumers:
+        i.join()
