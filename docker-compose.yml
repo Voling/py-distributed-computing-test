@@ -8,6 +8,7 @@ services:
   kafka:
     image: apache/kafka:latest
     container_name: vetology-kafka
+    attach: true
     ports:
       - "9092:9092" #internal listener
       - "9094:9094" #external listener
@@ -25,17 +26,17 @@ services:
       - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
       - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
     healthcheck:
-      test: ["CMD-SHELL", "bash -lc 'kafka-topics.sh --bootstrap-server localhost:9094 --list >/dev/null 2>&1'"]
+      test: ["CMD-SHELL", "nc -z localhost 9092 || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 30
   worker:
     build: ./worker/
-    command: celery -A tasks worker -l info -P solo
+    command: celery -A tasks worker -l info -P prefork --concurrency=4
     environment:
       - REDIS_URL=redis://redis:6379/0
     depends_on:
-      - redis
+      - bridge
   bridge:
     build: ./bridge/
     environment:
@@ -44,5 +45,15 @@ services:
       - TOPIC_NAME=quickstart-events
       - KAFKA_GROUP_ID=vetology-test
     depends_on:
-      - kafka
-      - redis
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports: ["9108:9108"]
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: vetology-prometheus
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
