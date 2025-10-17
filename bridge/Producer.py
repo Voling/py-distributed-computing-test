@@ -5,7 +5,7 @@ class Producer:
         self.topic_name = topic_name
         self.producer = KafkaProducer({'bootstrap.servers': broker_name})
         
-    def send(self, msg, repetitions=3):
+    def send(self, msg, repetitions=20):
         for i in range(repetitions):
             try:
                 message = f"{msg}{i}".encode('utf-8')

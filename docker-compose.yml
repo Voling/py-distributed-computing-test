@@ -1,4 +1,3 @@
-version: "3.9"
 services:
   redis:
     image: redis:latest
@@ -8,7 +7,7 @@ services:
   kafka:
     image: apache/kafka:latest
     container_name: vetology-kafka
-    attach: true
+    attach: false
     ports:
       - "9092:9092" #internal listener
       - "9094:9094" #external listener

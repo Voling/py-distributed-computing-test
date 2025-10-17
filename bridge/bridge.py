@@ -8,7 +8,9 @@ from celery import Celery
 from Producer import Producer
 import time
 from metrics import *
+import logging
 
+logger = logging.getLogger(__name__)
 load_dotenv()
 BROKER_NAME = getenv("BROKER_NAME", "kafka:9092")
 TOPIC_NAME = getenv("TOPIC_NAME", "quickstart-events")
@@ -37,9 +39,10 @@ def run_consumer(stop_event: threading.Event):
                 continue
             val = msg.value()
             try:
-                kafka_msgs_total.inc()
+                logger.info(val)
                 payload = json.loads(val.decode("utf-8"))
-            except Exception:
+                kafka_msgs_total.inc()
+            except Exception as e:
                 payload = {"raw": val.decode("utf-8", "ignore")}
             celery_app.send_task("hello", args=[payload])
             consumer.commit(msg) 
@@ -49,7 +52,7 @@ def _halt(*_): stop.set() #stop signal handler
 if __name__ == "__main__":
     producer = Producer(TOPIC_NAME, BROKER_NAME)
     for i in range(5):
-        msg = json.dumps({"message": f"HELLO {i}", "ts": time.time()})
+        msg = json.dumps({"message": f"HELLO {i} {time.time()}"})
         producer.send(msg, repetitions=1)
         time.sleep(0.5)
     signal.signal(signal.SIGINT, _halt)
